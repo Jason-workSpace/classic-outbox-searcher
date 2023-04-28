@@ -11,6 +11,7 @@ import {
   compareAndOutputPendingTx,
 } from './utils';
 import fs from 'fs';
+import { SUCESS } from './constant';
 
 let l1BatchProvider;
 let l2BatchProvider;
@@ -41,27 +42,11 @@ const main = async () => {
       const unexecuteProof = await getAllProofs(pending, l1BatchProvider, l2BatchProvider);
       await getAllEstimate(unexecuteProof, l1BatchProvider);
       const num: string[] = []
-      let one=0
-      let two=0
-      let three=0
-      let four=0
       for(let i of unexecuteProof) {
-        if(i[1].returnType === 1){
-            one++
+        if(i[1].returnType === SUCESS){
             num.push(i[1].estimateGas?.toHexString()!)
-        }else if(i[1].returnType === 2) {
-            two++
-        }else if(i[1].returnType === 3) {
-            three++
-        }else if(i[1].returnType === 4) {
-            four++
         }
-        
       }
-      console.log('1: ' + one)
-      console.log('2: ' + two)
-      console.log('3: ' + three)
-      console.log('4: ' + four)
       fs.writeFileSync("num", num.toString())
       break;
     default:
