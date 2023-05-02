@@ -38,7 +38,7 @@ const callToGetEvents = async (
   for (; counter <= to - 200000; counter += 20000) {
     promises.push(contract.queryFilter(filter, counter, counter + 19999));
     //each batch only contains 800000 blocks' call or it will cause rpc throughput errors
-    if (counter % (800000 + from) == 0) {
+    if (counter % 800000 == from && counter != from) {
       const cur = await Promise.all(promises);
       eventResults.push(...cur);
       promises = [];
@@ -153,7 +153,7 @@ export const getAllProofs = async (
     promises.push(getProof(item[1], l1BatchProvider, l2BatchProvider));
     counter++;
     // each batch only contains 800 proofs per call or it will cause rpc throughput errors
-    if (counter % 800 == 0) {
+    if (counter % 800 == 0 && counter != 0) {
       await Promise.all(promises);
       promises = [];
       console.log(`Now already got ${counter} proofs, sum ${pendingTxMap.size}`);
@@ -257,7 +257,7 @@ export const setAllEstimate = async (
     promises.push(estimateHandler(outbox, item[1]));
     counter++;
     // each batch only contains 100 call or it will cause rpc throughput errors
-    if (counter % 100 == 0) {
+    if (counter % 100 == 0 && counter != 0) {
       await Promise.all(promises);
       promises = [];
       console.log(`Now already estimated ${counter} txns, sum ${estimateInfo.size}`);
