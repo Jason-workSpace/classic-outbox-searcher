@@ -70,7 +70,6 @@ export const getAllWithdrawal = async (
   const arbsys = ArbSys__factory.connect(ARB_SYS_ADDRESS, l2BatchProvider);
   const filter = arbsys.filters.L2ToL1Transaction();
   const res = await callToGetEvents(from, to, arbsys, filter);
-
   return res;
 };
 
@@ -92,7 +91,6 @@ const readAndGetAllTx = (filePath: string, withdrawlType: boolean): Map<string, 
   const buffer = rawData.buffer.slice(rawData.byteOffset, rawData.byteOffset + rawData.byteLength);
   const rawString = Buffer.from(buffer).toString();
   const rawArray = rawString.split(',');
-  // console.log(withdrawRawArry)
   const txInfo = extractTxInfo(rawArray, withdrawlType);
   return txInfo;
 };
