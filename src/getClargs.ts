@@ -29,6 +29,7 @@ const argv = yargs(process.argv.slice(2))
     },
   })
   .demandOption('action')
+  .demandOption('outputFile')
   .parseSync();
 
 export default argv;

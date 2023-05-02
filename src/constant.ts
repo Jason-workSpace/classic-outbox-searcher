@@ -12,7 +12,7 @@ export interface TxInfo {
   txhash: string;
   batchNumber: BigNumber;
   indexInBatch: BigNumber;
-  inputs: MessageBatchProofInfo | null;
+  inputs: string | null;
   returnType: number;
   estimateGas: BigNumber | null;
 }
@@ -39,4 +39,7 @@ export const UNKNOWN_ERROR = 4;
 export const OUTBOX_TYPE = false;
 export const WITHDRAW_TYPE = true;
 
-const outboxes = ['0x667e23ABd27E623c11d4CC00ca3EC4d0bD63337a', '0x760723CD2e632826c38Fef8CD438A4CC7E7E1A40']
+export const outboxes = [
+  '0x667e23ABd27E623c11d4CC00ca3EC4d0bD63337a',
+  '0x760723CD2e632826c38Fef8CD438A4CC7E7E1A40',
+];

@@ -1,10 +1,7 @@
 import { ArbSys__factory } from '@arbitrum/sdk/dist/lib/abi/factories/ArbSys__factory';
 import { ARB_SYS_ADDRESS } from '@arbitrum/sdk/dist/lib/dataEntities/constants';
 import { Outbox__factory } from '@arbitrum/sdk/dist/lib/abi/classic/factories/Outbox__factory';
-import {
-  L2ToL1MessageClassic,
-  MessageBatchProofInfo,
-} from '@arbitrum/sdk/dist/lib/message/L2ToL1MessageClassic';
+import { L2ToL1MessageClassic } from '@arbitrum/sdk/dist/lib/message/L2ToL1MessageClassic';
 import { BaseContract, BigNumber, ethers, EventFilter, providers } from 'ethers';
 import args from './getClargs';
 import fs from 'fs';
@@ -13,6 +10,7 @@ import {
   ALREADY_SPENT,
   NOT_INIT,
   NO_OUTBOX_ENTRY,
+  outboxes,
   OutboxSearchConfig,
   OUTBOX_TYPE,
   SearchConfig,
@@ -39,12 +37,12 @@ const callToGetEvents = async (
   let counter = from;
   for (; counter <= to - 200000; counter += 20000) {
     promises.push(contract.queryFilter(filter, counter, counter + 19999));
-    //each batch only contains 800 call or it will cause rpc throughput errors
+    //each batch only contains 800000 blocks' call or it will cause rpc throughput errors
     if (counter % 800000 == 0) {
-        console.log(counter)
       const cur = await Promise.all(promises);
       eventResults.push(...cur);
       promises = [];
+      console.log(`Now already got ${counter} events, sum ${to}`);
       wait(1500); //sleep or it will cause rpc throughput errors
     }
   }
@@ -77,14 +75,12 @@ export const getAllWithdrawal = async (
 };
 
 export const getAllOutBoxExecuted = async (
+  outboxAddr: string,
   from: number,
   to: number,
   l1BatchProvider: providers.JsonRpcBatchProvider,
 ) => {
-  const outbox = Outbox__factory.connect(
-    '0x760723cd2e632826c38fef8cd438a4cc7e7e1a40',
-    l1BatchProvider,
-  );
+  const outbox = Outbox__factory.connect(outboxAddr, l1BatchProvider);
   const filter = outbox.filters.OutBoxTransactionExecuted();
   const res = await callToGetEvents(from, to, outbox, filter);
   return res;
@@ -123,7 +119,7 @@ const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<string, T
   //Get the related config, which is used when search the event args
   const searchConfig: SearchConfig = withdrawlType ? WithdrawSearchConfig : OutboxSearchConfig;
   //See the event array is valid or not
-  if(rawArry.length % searchConfig.eachLength != 0) {
+  if (rawArry.length % searchConfig.eachLength != 0) {
     throw Error('Wrong type tx event input');
   }
   for (let i = 0; i < rawArry.length; i += searchConfig.eachLength) {
@@ -154,13 +150,13 @@ export const getAllProofs = async (
   let promises: Promise<void>[] = [];
   let counter = 0;
   for (const item of pendingTxMap) {
-    promises.push(getProof(item[1],l1BatchProvider,l2BatchProvider));
+    promises.push(getProof(item[1], l1BatchProvider, l2BatchProvider));
     counter++;
-    // each batch only contains 800 call or it will cause rpc throughput errors
+    // each batch only contains 800 proofs per call or it will cause rpc throughput errors
     if (counter % 800 == 0) {
-      const currProof = await Promise.all(promises);
+      await Promise.all(promises);
       promises = [];
-      console.log(counter);
+      console.log(`Now already got ${counter} proofs, sum ${pendingTxMap.size}`);
       wait(1500); //sleep or it will cause rpc throughput errors
     }
   }
@@ -170,29 +166,22 @@ export const getAllProofs = async (
 };
 
 const getProof = async (
-    txinfo:TxInfo,
-    l1BatchProvider: providers.JsonRpcBatchProvider,
-    l2BatchProvider: providers.JsonRpcBatchProvider
+  txinfo: TxInfo,
+  l1BatchProvider: providers.JsonRpcBatchProvider,
+  l2BatchProvider: providers.JsonRpcBatchProvider,
 ) => {
-    const l2ToL1Classic = L2ToL1MessageClassic.fromBatchNumber(
-      l1BatchProvider,
-      txinfo.batchNumber,
-      txinfo.indexInBatch,
-    );
-    const proof = await l2ToL1Classic.tryGetProof(l2BatchProvider)
-    txinfo.inputs = proof
-}
-
-//send eth_estimateGas and catch the errors, if errors returned, mentioned at item.returnType
-const estimateHandler = async (outbox: Outbox, item: TxInfo) => {
-  const proofInfo = item.inputs;
-  let res: BigNumber;
+  const iOutbox = Outbox__factory.createInterface();
+  const l2ToL1Classic = L2ToL1MessageClassic.fromBatchNumber(
+    l1BatchProvider,
+    txinfo.batchNumber,
+    txinfo.indexInBatch,
+  );
+  const proofInfo = await l2ToL1Classic.tryGetProof(l2BatchProvider);
   if (proofInfo === null) {
-    return;
-  }
-  try {
-    res = await outbox.estimateGas.executeTransaction(
-      item.batchNumber,
+    txinfo.inputs = null;
+  } else {
+    txinfo.inputs = iOutbox.encodeFunctionData('executeTransaction', [
+      txinfo.batchNumber,
       proofInfo.proof,
       proofInfo.path,
       proofInfo.l2Sender,
@@ -202,7 +191,32 @@ const estimateHandler = async (outbox: Outbox, item: TxInfo) => {
       proofInfo.timestamp,
       proofInfo.amount,
       proofInfo.calldataForL1,
-    );
+    ]);
+  }
+};
+
+const setOneJSON = (outboxAddr: string, txInfo: TxInfo): string => {
+  return `
+  {
+    l2txhash: ${txInfo.txhash},
+    batchNumber: ${txInfo.batchNumber},
+    indexInBatch: ${txInfo.indexInBatch},
+    returnType: ${txInfo.returnType},
+    outbox: ${outboxAddr},
+    calldata: ${txInfo.inputs},
+    estimateGas: ${txInfo.estimateGas}
+  }`;
+};
+
+//send eth_estimateGas and catch the errors, if errors returned, mentioned at item.returnType
+const estimateHandler = async (outbox: Outbox, item: TxInfo) => {
+  const proofInfo = item.inputs;
+  let res: BigNumber;
+  if (proofInfo === null) {
+    return;
+  }
+  try {
+    res = await outbox.provider.estimateGas({ to: outbox.address, data: item.inputs! });
   } catch (err) {
     const e = err as Error;
     if (e?.message?.toString().includes('ALREADY_SPENT')) {
@@ -210,7 +224,7 @@ const estimateHandler = async (outbox: Outbox, item: TxInfo) => {
     } else if (e?.message?.toString().includes('NO_OUTBOX_ENTRY')) {
       item.returnType = NO_OUTBOX_ENTRY;
     } else {
-        console.log(e?.message?.toString())
+      console.log(e?.message?.toString());
       item.returnType = UNKNOWN_ERROR;
     }
     return;
@@ -219,15 +233,12 @@ const estimateHandler = async (outbox: Outbox, item: TxInfo) => {
   item.estimateGas = res;
 };
 
-export const getAllEstimate = async (
+export const setAllEstimate = async (
+  outboxAddr: string,
   estimateInfo: Map<string, TxInfo>,
   l1BatchProvider: providers.JsonRpcBatchProvider,
 ) => {
-  
-  const outbox = Outbox__factory.connect(
-    '0x760723cd2e632826c38fef8cd438a4cc7e7e1a40',
-    l1BatchProvider,
-  );
+  const outbox = Outbox__factory.connect(outboxAddr, l1BatchProvider);
 
   let promises: Promise<void>[] = [];
   let counter = 0;
@@ -238,10 +249,19 @@ export const getAllEstimate = async (
     if (counter % 100 == 0) {
       await Promise.all(promises);
       promises = [];
+      console.log(`Now already estimated ${counter} txns, sum ${estimateInfo.size}`);
       wait(1500); //sleep or it will cause rpc throughput errors
     }
   }
   await Promise.all(promises);
+};
+
+export const setTxInfoJSON = (ouboxAddr: string, txMap: Map<string, TxInfo>) => {
+  const TxInfoJSON: string[] = [];
+  for (const item of txMap) {
+    TxInfoJSON.push(setOneJSON(ouboxAddr, item[1]));
+  }
+  return TxInfoJSON;
 };
 
 export const checkBlockRange = () => {
@@ -253,13 +273,7 @@ export const checkBlockRange = () => {
   }
 };
 
-export const checkOutput = () => {
-  if (!args.outputFile) {
-    throw new Error('You need set outputFile');
-  }
-};
-
-export const checkAndGetInput = () => {
+export const checkAndGetTxns = () => {
   if (!args.outboxInput || !args.withdrawInput) {
     throw new Error('You need set both outbox and withdraw tx files');
   }
@@ -276,4 +290,14 @@ export const checkAndGetProvider = (rpcUrl: string | undefined) => {
     throw new Error('No l1 rpc url provided');
   }
   return new ethers.providers.JsonRpcBatchProvider(rpcUrl);
+};
+
+export const getOutbox = () => {
+  if (args.outboxType === 'outbox3') {
+    return outboxes[1];
+  } else if (args.outboxType === 'outbox2') {
+    return outboxes[0];
+  } else {
+    throw new Error('Wrong outbox type');
+  }
 };

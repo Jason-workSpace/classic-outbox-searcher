@@ -3,52 +3,54 @@ import {
   getAllWithdrawal,
   getAllOutBoxExecuted,
   getAllProofs,
-  getAllEstimate,
+  setAllEstimate,
   checkBlockRange,
-  checkOutput,
   checkAndGetProvider,
-  checkAndGetInput,
+  checkAndGetTxns,
   compareAndOutputPendingTx,
+  setTxInfoJSON,
+  getOutbox,
 } from './utils';
 import fs from 'fs';
-import { SUCESS } from './constant';
 
 let l1BatchProvider;
 let l2BatchProvider;
 
-//TODO: 2 outboxes
 const main = async () => {
+  let outboxAddr;
   switch (args.action) {
     case 'GetOutboxEvent':
       checkBlockRange();
-      checkOutput();
       l1BatchProvider = checkAndGetProvider(args.l1RpcUrl);
-      const outBoxTx = await getAllOutBoxExecuted(args.from!, args.to!, l1BatchProvider);
+      outboxAddr = getOutbox();
+      const outBoxTx = await getAllOutBoxExecuted(
+        outboxAddr,
+        args.from!,
+        args.to!,
+        l1BatchProvider,
+      );
       fs.writeFileSync(args.outputFile!, outBoxTx.toString());
       break;
+
     case 'GetWithdrawEvent':
       checkBlockRange();
-      checkOutput();
       l2BatchProvider = checkAndGetProvider(args.l2RpcUrl);
       const withdrawalTx = await getAllWithdrawal(args.from!, args.to!, l2BatchProvider);
-      console.log(withdrawalTx)
       fs.writeFileSync(args.outputFile!, withdrawalTx.toString());
       break;
+
     case `CompareAndGetEstimate`:
       l1BatchProvider = checkAndGetProvider(args.l1RpcUrl);
       l2BatchProvider = checkAndGetProvider(args.l2RpcUrl);
-      const txs = checkAndGetInput();
-      const pending = compareAndOutputPendingTx(txs.withdraw, txs.outbox);
-      const unexecuteProof = await getAllProofs(pending, l1BatchProvider, l2BatchProvider);
-      await getAllEstimate(unexecuteProof, l1BatchProvider);
-      const num: string[] = []
-      for(let i of unexecuteProof) {
-        if(i[1].returnType === SUCESS){
-            num.push(i[1].estimateGas?.toHexString()!)
-        }
-      }
-      fs.writeFileSync("num", num.toString())
+      outboxAddr = getOutbox();
+      const txns = checkAndGetTxns();
+      const txInfo = compareAndOutputPendingTx(txns.withdraw, txns.outbox);
+      await getAllProofs(txInfo, l1BatchProvider, l2BatchProvider);
+      await setAllEstimate(outboxAddr, txInfo, l1BatchProvider);
+      const txInfoJSONs = setTxInfoJSON(outboxAddr, txInfo);
+      fs.writeFileSync(args.outputFile!, txInfoJSONs.toString());
       break;
+      
     default:
       console.log(`Unknown action: ${args.action}`);
   }
