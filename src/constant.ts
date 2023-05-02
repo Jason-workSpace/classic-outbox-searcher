@@ -14,6 +14,7 @@ export interface TxInfo {
   indexInBatch: BigNumber;
   inputs: string | null;
   returnType: number;
+  outbox: string;
   estimateGas: BigNumber | null;
 }
 

@@ -42,12 +42,12 @@ const main = async () => {
     case `CompareAndGetEstimate`:
       l1BatchProvider = checkAndGetProvider(args.l1RpcUrl);
       l2BatchProvider = checkAndGetProvider(args.l2RpcUrl);
-      outboxAddr = getOutbox();
+      // outboxAddr = getOutbox();
       const txns = checkAndGetTxns();
       const txInfo = compareAndOutputPendingTx(txns.withdraw, txns.outbox);
       await getAllProofs(txInfo, l1BatchProvider, l2BatchProvider);
-      await setAllEstimate(outboxAddr, txInfo, l1BatchProvider);
-      const txInfoJSONs = setTxInfoJSON(outboxAddr, txInfo);
+      await setAllEstimate(txInfo, l1BatchProvider);
+      const txInfoJSONs = setTxInfoJSON(txInfo);
       fs.writeFileSync(args.outputFile!, txInfoJSONs.toString());
       break;
       

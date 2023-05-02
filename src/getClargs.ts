@@ -8,6 +8,7 @@ const argv = yargs(process.argv.slice(2))
     },
     from: {
       type: 'number',
+      default: 0,
     },
     to: {
       type: 'number',

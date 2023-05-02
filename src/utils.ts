@@ -38,7 +38,7 @@ const callToGetEvents = async (
   for (; counter <= to - 200000; counter += 20000) {
     promises.push(contract.queryFilter(filter, counter, counter + 19999));
     //each batch only contains 800000 blocks' call or it will cause rpc throughput errors
-    if (counter % 800000 == 0) {
+    if (counter % (800000 + from) == 0) {
       const cur = await Promise.all(promises);
       eventResults.push(...cur);
       promises = [];
@@ -123,12 +123,14 @@ const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<string, T
     throw Error('Wrong type tx event input');
   }
   for (let i = 0; i < rawArry.length; i += searchConfig.eachLength) {
+    const batchNumber = BigNumber.from(rawArry[i + searchConfig.batchNumberAt])
     const currentElem: TxInfo = {
       txhash: rawArry[i + searchConfig.txhashAt],
-      batchNumber: BigNumber.from(rawArry[i + searchConfig.batchNumberAt]),
+      batchNumber: batchNumber,
       indexInBatch: BigNumber.from(rawArry[i + searchConfig.indexInBatchAt]),
       inputs: null,
       returnType: NOT_INIT,
+      outbox: batchNumber.gt(30) ? outboxes[1] : outboxes[0],
       estimateGas: BigNumber.from(0),
     };
     const curKey = ethers.utils.solidityKeccak256(
@@ -195,15 +197,27 @@ const getProof = async (
   }
 };
 
-const setOneJSON = (outboxAddr: string, txInfo: TxInfo): string => {
+const setOneJSON = (txInfo: TxInfo): string => {
+  const iOutbox = Outbox__factory.createInterface()
+  let targetAddr
+  let targetCalldata
+
+  if(txInfo.inputs !== null) {
+    const decodedData = iOutbox.decodeFunctionData("executeTransaction",txInfo.inputs)
+    targetAddr = decodedData[4]
+    targetCalldata = decodedData[9]
+  }
+  
   return `
   {
     l2txhash: ${txInfo.txhash},
     batchNumber: ${txInfo.batchNumber},
     indexInBatch: ${txInfo.indexInBatch},
     returnType: ${txInfo.returnType},
-    outbox: ${outboxAddr},
+    outbox: ${txInfo.outbox},
     calldata: ${txInfo.inputs},
+    targetAddr: ${targetAddr},
+    targetCalldata: ${targetCalldata},
     estimateGas: ${txInfo.estimateGas}
   }`;
 };
@@ -234,15 +248,14 @@ const estimateHandler = async (outbox: Outbox, item: TxInfo) => {
 };
 
 export const setAllEstimate = async (
-  outboxAddr: string,
   estimateInfo: Map<string, TxInfo>,
   l1BatchProvider: providers.JsonRpcBatchProvider,
 ) => {
-  const outbox = Outbox__factory.connect(outboxAddr, l1BatchProvider);
-
   let promises: Promise<void>[] = [];
   let counter = 0;
   for (const item of estimateInfo) {
+    const outboxAddr = item[1].outbox;
+    const outbox = Outbox__factory.connect(outboxAddr, l1BatchProvider);
     promises.push(estimateHandler(outbox, item[1]));
     counter++;
     // each batch only contains 100 call or it will cause rpc throughput errors
@@ -256,17 +269,17 @@ export const setAllEstimate = async (
   await Promise.all(promises);
 };
 
-export const setTxInfoJSON = (ouboxAddr: string, txMap: Map<string, TxInfo>) => {
+export const setTxInfoJSON = (txMap: Map<string, TxInfo>) => {
   const TxInfoJSON: string[] = [];
   for (const item of txMap) {
-    TxInfoJSON.push(setOneJSON(ouboxAddr, item[1]));
+    TxInfoJSON.push(setOneJSON(item[1]));
   }
   return TxInfoJSON;
 };
 
 export const checkBlockRange = () => {
-  if (!args.from || !args.to) {
-    throw new Error('You need set both from and to');
+  if (!args.to) {
+    throw new Error('You need set to');
   }
   if (args.to < args.from) {
     throw new Error('from should not higher than to');
