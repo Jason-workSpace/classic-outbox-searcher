@@ -128,7 +128,7 @@ const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<string, T
       indexInBatch: BigNumber.from(rawArry[i + searchConfig.indexInBatchAt]),
       inputs: null,
       returnType: NOT_INIT,
-      outbox: batchNumber.gt(30) ? outboxes[1] : outboxes[0],
+      outbox: batchNumber.lt(30) ? outboxes[0] : outboxes[1],
       estimateGas: BigNumber.from(0),
     };
     const curKey = ethers.utils.solidityKeccak256(
