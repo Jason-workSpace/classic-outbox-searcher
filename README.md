@@ -21,7 +21,9 @@ yarn ts-node ./src/main.ts --action GetWithdrawEvent --from {FROM_BLOCK} --to {T
 ```
 
 3. Get all estimate jsons:
+```
 yarn ts-node ./src/main.ts --action CompareAndGetEstimate --l2RpcUrl {YOUR_L2_RPC_URL} --l1RpcUrl {YOUR_L1_RPC_URL} --outputFile {THE_OUTPUTFILE} --outboxInput {OUTBOX_FILE} --withdrawInput {WITHDRAW_FILE}
+```
 
 ## Json Returns
 Here is the json example return:
