@@ -304,10 +304,10 @@ export const checkAndGetProvider = (rpcUrl: string | undefined) => {
 };
 
 export const getOutbox = () => {
-  if (args.outboxType === 'outbox3') {
-    return outboxes[1];
-  } else if (args.outboxType === 'outbox2') {
+  if (args.outboxType === 'outbox2') {
     return outboxes[0];
+  } else if (args.outboxType === 'outbox3') {
+    return outboxes[1];
   } else {
     throw new Error('Wrong outbox type');
   }
