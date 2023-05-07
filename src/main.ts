@@ -47,7 +47,6 @@ const main = async () => {
 
     case `CompareAndGetEstimate`:
       l1BatchProvider = checkAndGetProvider(args.l1RpcUrl);
-      l2BatchProvider = checkAndGetProvider(args.l2RpcUrl);
       // outboxAddr = getOutbox();
       const txns = checkAndGetTxns();
       txInfo = compareAndOutputPendingTx(txns.withdraw, txns.outbox);

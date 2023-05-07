@@ -36,15 +36,15 @@ const callToGetEvents = async (
   //To reduce the rpc call load, we use JsonRpcBatchProvider way.
   let promises: Promise<ethers.Event[]>[] = [];
   let counter = from;
-  for (; counter <= to - 200000; counter += 20000) {
-    promises.push(contract.queryFilter(filter, counter, counter + 19999));
+  for (; counter <= to - 200000; counter += 200000) {
+    promises.push(contract.queryFilter(filter, counter, counter + 199999));
     //each batch only contains 800000 blocks' call or it will cause rpc throughput errors
-    if (counter % 800000 == from && counter != from) {
+    if (counter % 1200000 == from && counter != from) {
       const cur = await Promise.all(promises);
       eventResults.push(...cur);
       promises = [];
-      console.log(`Now already got ${counter} events, sum ${to}`);
-      wait(1500); //sleep or it will cause rpc throughput errors
+      console.log(`Now already search ${counter} blocks for events, sum ${to}`);
+      wait(1150); //sleep or it will cause rpc throughput errors
     }
   }
   promises.push(contract.queryFilter(filter, counter, to));
@@ -69,15 +69,38 @@ export const getTxPath = async (
   l2BatchProvider: providers.JsonRpcBatchProvider,
 ) => {
   let counter = 0;
-  let promises: Promise<void>[] = [];
+  let promises: Promise<number>[] = [];
   for(;counter < events.length ; counter++) {
     promises.push(getProofToArr(events[counter], l1BatchProvider, l2BatchProvider))
     //each batch only contains 800000 blocks' call or it will cause rpc throughput errors
-    if (counter % 950 == 0 && counter != 0) {
-      await Promise.all(promises);
+    if (counter % 980 == 0 && counter != 0) {
+      let n: number[] = []
+      try {
+        n = await Promise.all(promises);
+      } catch {
+        console.log("seems timeout, retrying...")
+        n = await Promise.all(promises);
+      }
+      for(let k = 0; k < n.length; k++) {
+        if(n[k] != 13) {
+          console.log("Wrong!!! " + counter)
+        }
+      }
       promises = [];
       console.log(`Now already got ${counter} proofs, sum ${events.length}`);
       wait(1250); //sleep or it will cause rpc throughput errors
+    }
+  }
+  let n: number[] = []
+  try {
+    n = await Promise.all(promises);
+  } catch {
+    console.log("seems timeout, retrying...")
+    n = await Promise.all(promises);
+  }
+  for(let k = 0; k < n.length; k++) {
+    if(n[k] != 13) {
+      console.log("Wrong!!! " + counter)
     }
   }
 };
@@ -86,7 +109,7 @@ const getProofToArr = async (
   event: string[],
   l1BatchProvider: providers.JsonRpcBatchProvider,
   l2BatchProvider: providers.JsonRpcBatchProvider,
-) => {
+): Promise<number> => {
   const iOutbox = Outbox__factory.createInterface();
   const l2ToL1Classic = L2ToL1MessageClassic.fromBatchNumber(
     l1BatchProvider,
@@ -96,8 +119,8 @@ const getProofToArr = async (
   const proofInfo = await l2ToL1Classic.tryGetProof(l2BatchProvider);
   let inputs: string
   if (proofInfo === null) {
-    console.error("Error: find one null proof")
-    getProofToArr(event,l1BatchProvider,l2BatchProvider)
+    console.log("Error: find one null proof")
+    return await getProofToArr(event,l1BatchProvider,l2BatchProvider)
   } else {
     inputs = iOutbox.encodeFunctionData('executeTransaction', [
       BigNumber.from(event[WithdrawSearchConfig.batchNumberAt]),
@@ -113,6 +136,7 @@ const getProofToArr = async (
     ]);
     event.push(proofInfo.path.toString())
     event.push(inputs)
+    return event.length
   }
   
 };
@@ -164,7 +188,7 @@ export const compareAndOutputPendingTx = (
       pendingTx.set(key, value);
     }
   });
-
+  console.log(pendingTx.size)
   return pendingTx;
 };
 
@@ -175,6 +199,8 @@ export const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<st
   const searchConfig: SearchConfig = withdrawlType ? WithdrawSearchConfig : OutboxSearchConfig;
   //See the event array is valid or not
   if (rawArry.length % searchConfig.eachLength != 0) {
+    console.log(rawArry.length)
+    console.log(rawArry.length%13)
     throw Error('Wrong type tx event input');
   }
   for (let i = 0; i < rawArry.length; i += searchConfig.eachLength) {
@@ -366,7 +392,7 @@ export const checkAndGetTxns = () => {
 
 export const checkAndGetProvider = (rpcUrl: string | undefined) => {
   if (!rpcUrl) {
-    throw new Error('No l1 rpc url provided');
+    throw new Error('No rpc url provided');
   }
   return new ethers.providers.JsonRpcBatchProvider(rpcUrl);
 };
