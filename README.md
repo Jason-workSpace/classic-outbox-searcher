@@ -47,5 +47,6 @@ export const SUCESS = 1;
 export const ALREADY_SPENT = 2;
 export const NO_OUTBOX_ENTRY = 3;
 export const UNKNOWN_ERROR = 4;
+export const HOP_ALREADY_CONFIRMED = 5;
 ```
 When we see UNKNOWN_ERROR, the reason might be the following user execution will revert or some errors from rpc (If it is this type, we need rerun this).

@@ -10,14 +10,18 @@ import {
   compareAndOutputPendingTx,
   setTxInfoJSON,
   getOutbox,
+  extractTxInfo,
+  getTxPath,
 } from './utils';
 import fs from 'fs';
+import { TxInfo, WITHDRAW_TYPE } from './constant';
 
 let l1BatchProvider;
 let l2BatchProvider;
 
 const main = async () => {
   let outboxAddr;
+  let txInfo;
   switch (args.action) {
     case 'GetOutboxEvent':
       checkBlockRange();
@@ -34,8 +38,10 @@ const main = async () => {
 
     case 'GetWithdrawEvent':
       checkBlockRange();
+      l1BatchProvider = checkAndGetProvider(args.l1RpcUrl);
       l2BatchProvider = checkAndGetProvider(args.l2RpcUrl);
       const withdrawalTx = await getAllWithdrawal(args.from!, args.to!, l2BatchProvider);
+      await getTxPath(withdrawalTx, l1BatchProvider, l2BatchProvider)
       fs.writeFileSync(args.outputFile!, withdrawalTx.toString());
       break;
 
@@ -44,8 +50,7 @@ const main = async () => {
       l2BatchProvider = checkAndGetProvider(args.l2RpcUrl);
       // outboxAddr = getOutbox();
       const txns = checkAndGetTxns();
-      const txInfo = compareAndOutputPendingTx(txns.withdraw, txns.outbox);
-      await getAllProofs(txInfo, l1BatchProvider, l2BatchProvider);
+      txInfo = compareAndOutputPendingTx(txns.withdraw, txns.outbox);
       await setAllEstimate(txInfo, l1BatchProvider);
       const txInfoJSONs = setTxInfoJSON(txInfo);
       fs.writeFileSync(args.outputFile!, txInfoJSONs.toString());

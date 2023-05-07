@@ -19,10 +19,10 @@ export interface TxInfo {
 }
 
 export const WithdrawSearchConfig: SearchConfig = {
-  eachLength: 11,
+  eachLength: 13,
   txhashAt: 10,
   batchNumberAt: 3,
-  indexInBatchAt: 4,
+  indexInBatchAt: 11,
 };
 
 export const OutboxSearchConfig: SearchConfig = {
@@ -37,6 +37,7 @@ export const SUCESS = 1;
 export const ALREADY_SPENT = 2;
 export const NO_OUTBOX_ENTRY = 3;
 export const UNKNOWN_ERROR = 4;
+export const HOP_ALREADY_CONFIRMED = 5;
 export const OUTBOX_TYPE = false;
 export const WITHDRAW_TYPE = true;
 
