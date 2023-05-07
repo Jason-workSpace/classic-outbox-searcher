@@ -234,10 +234,6 @@ export const getAllProofs = async (
   let promises: Promise<void>[] = [];
   let counter = 0;
   for (const item of pendingTxMap) {
-    if(counter <17800) {
-      counter++
-      continue
-    }
     promises.push(getProof(item[1], l1BatchProvider, l2BatchProvider));
     counter++;
     // each batch only contains 800 proofs per call or it will cause rpc throughput errors
@@ -342,16 +338,12 @@ export const setAllEstimate = async (
   let promises: Promise<void>[] = [];
   let counter = 0;
   for (const item of estimateInfo) {
-    if(counter < 17800) {
-      counter++;
-      continue;
-    }
     const outboxAddr = item[1].outbox;
     const outbox = Outbox__factory.connect(outboxAddr, l1BatchProvider);
     promises.push(estimateHandler(outbox, item[1]));
     counter++;
     // each batch only contains 100 call or it will cause rpc throughput errors
-    if (counter % 130 == 0 && counter != 0) {
+    if (counter % 120 == 0 && counter != 0) {
       await Promise.all(promises);
       promises = [];
       console.log(`Now already estimated ${counter} txns, sum ${estimateInfo.size}`);
