@@ -219,6 +219,7 @@ const setOneJSON = (txInfo: TxInfo): string => {
     "calldata": "${txInfo.inputs}",
     "targetAddr": "${targetAddr}",
     "targetCalldata": "${targetCalldata}",
+    "callValue": "${txInfo.callValue}",
     "estimateGas": ${txInfo.estimateGas}
   }`;
 };
