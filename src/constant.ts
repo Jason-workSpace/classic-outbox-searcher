@@ -5,13 +5,13 @@ export interface SearchConfig {
   eachLength: number;
   txhashAt: number;
   batchNumberAt: number;
-  indexInBatchAt: number;
+  path: number;
 }
 
 export interface TxInfo {
   txhash: string;
   batchNumber: BigNumber;
-  indexInBatch: BigNumber;
+  path: BigNumber;
   inputs: string | null;
   returnType: number;
   outbox: string;
@@ -22,14 +22,14 @@ export const WithdrawSearchConfig: SearchConfig = {
   eachLength: 13,
   txhashAt: 10,
   batchNumberAt: 3,
-  indexInBatchAt: 11,
+  path: 11,
 };
 
 export const OutboxSearchConfig: SearchConfig = {
   eachLength: 5,
   txhashAt: 4,
   batchNumberAt: 2,
-  indexInBatchAt: 3,
+  path: 3,
 };
 
 export const NOT_INIT = 0;

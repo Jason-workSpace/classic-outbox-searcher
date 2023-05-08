@@ -2,7 +2,6 @@ import args from './getClargs';
 import {
   getAllWithdrawal,
   getAllOutBoxExecuted,
-  getAllProofs,
   setAllEstimate,
   checkBlockRange,
   checkAndGetProvider,
@@ -10,11 +9,9 @@ import {
   compareAndOutputPendingTx,
   setTxInfoJSON,
   getOutbox,
-  extractTxInfo,
   getTxPath,
 } from './utils';
 import fs from 'fs';
-import { TxInfo, WITHDRAW_TYPE } from './constant';
 
 let l1BatchProvider;
 let l2BatchProvider;

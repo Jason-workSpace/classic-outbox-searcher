@@ -22,7 +22,6 @@ import {
   WITHDRAW_TYPE,
 } from './constant';
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 //Use batchProvider to call batch of target filter event
 const callToGetEvents = async (
@@ -38,13 +37,12 @@ const callToGetEvents = async (
   let counter = from;
   for (; counter <= to - 200000; counter += 200000) {
     promises.push(contract.queryFilter(filter, counter, counter + 199999));
-    //each batch only contains 800000 blocks' call or it will cause rpc throughput errors
+    //each batch only contains 1200000 blocks' call or it will cause rpc throughput errors
     if (counter % 1200000 == from && counter != from) {
       const cur = await Promise.all(promises);
       eventResults.push(...cur);
       promises = [];
       console.log(`Now already search ${counter} blocks for events, sum ${to}`);
-      wait(1150); //sleep or it will cause rpc throughput errors
     }
   }
   promises.push(contract.queryFilter(filter, counter, to));
@@ -72,37 +70,14 @@ export const getTxPath = async (
   let promises: Promise<number>[] = [];
   for(;counter < events.length ; counter++) {
     promises.push(getProofToArr(events[counter], l1BatchProvider, l2BatchProvider))
-    //each batch only contains 800000 blocks' call or it will cause rpc throughput errors
+    //each batch only contains 980 proof call or it will cause rpc throughput errors
     if (counter % 980 == 0 && counter != 0) {
-      let n: number[] = []
-      try {
-        n = await Promise.all(promises);
-      } catch {
-        console.log("seems timeout, retrying...")
-        n = await Promise.all(promises);
-      }
-      for(let k = 0; k < n.length; k++) {
-        if(n[k] != 13) {
-          console.log("Wrong!!! " + counter)
-        }
-      }
-      promises = [];
-      console.log(`Now already got ${counter} proofs, sum ${events.length}`);
-      wait(1250); //sleep or it will cause rpc throughput errors
+      await Promise.all(promises);
     }
+    promises = [];
+    console.log(`Now already got ${counter} proofs, sum ${events.length}`);
   }
-  let n: number[] = []
-  try {
-    n = await Promise.all(promises);
-  } catch {
-    console.log("seems timeout, retrying...")
-    n = await Promise.all(promises);
-  }
-  for(let k = 0; k < n.length; k++) {
-    if(n[k] != 13) {
-      console.log("Wrong!!! " + counter)
-    }
-  }
+  await Promise.all(promises);
 };
 
 const getProofToArr = async (
@@ -113,8 +88,8 @@ const getProofToArr = async (
   const iOutbox = Outbox__factory.createInterface();
   const l2ToL1Classic = L2ToL1MessageClassic.fromBatchNumber(
     l1BatchProvider,
-    BigNumber.from(event[3]),
-    BigNumber.from(event[4]),
+    BigNumber.from(event[3]), // Bacth number index
+    BigNumber.from(event[4]), // IndexInbatch index
   );
   const proofInfo = await l2ToL1Classic.tryGetProof(l2BatchProvider);
   let inputs: string
@@ -199,8 +174,6 @@ export const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<st
   const searchConfig: SearchConfig = withdrawlType ? WithdrawSearchConfig : OutboxSearchConfig;
   //See the event array is valid or not
   if (rawArry.length % searchConfig.eachLength != 0) {
-    console.log(rawArry.length)
-    console.log(rawArry.length%13)
     throw Error('Wrong type tx event input');
   }
   for (let i = 0; i < rawArry.length; i += searchConfig.eachLength) {
@@ -208,7 +181,8 @@ export const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<st
     const currentElem: TxInfo = {
       txhash: rawArry[i + searchConfig.txhashAt],
       batchNumber: batchNumber,
-      indexInBatch: BigNumber.from(rawArry[i + searchConfig.indexInBatchAt]),
+      path: BigNumber.from(rawArry[i + searchConfig.path]),
+      //Input's index in withdraw array is 12th of each length
       inputs: withdrawlType ? rawArry[i + 12]: null,
       returnType: NOT_INIT,
       outbox: batchNumber.lt(30) ? outboxes[0] : outboxes[1],
@@ -216,67 +190,12 @@ export const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<st
     };
     const curKey = ethers.utils.solidityKeccak256(
       ['uint256', 'uint256'],
-      [currentElem.batchNumber, currentElem.indexInBatch],
+      [currentElem.batchNumber, currentElem.path],
     );
     txMap.set(curKey, currentElem);
   }
 
   return txMap;
-};
-
-
-export const getAllProofs = async (
-  pendingTxMap: Map<string, TxInfo>,
-  l1BatchProvider: providers.JsonRpcBatchProvider,
-  l2BatchProvider: providers.JsonRpcBatchProvider,
-) => {
-  //To reduce the rpc call load, we use JsonRpcBatchProvider way.
-  let promises: Promise<void>[] = [];
-  let counter = 0;
-  for (const item of pendingTxMap) {
-    promises.push(getProof(item[1], l1BatchProvider, l2BatchProvider));
-    counter++;
-    // each batch only contains 800 proofs per call or it will cause rpc throughput errors
-    if (counter % 1000 == 0 && counter != 0) {
-      await Promise.all(promises);
-      promises = [];
-      console.log(`Now already got ${counter} proofs, sum ${pendingTxMap.size}`);
-      wait(1500); //sleep or it will cause rpc throughput errors
-    }
-  }
-  // //Call those promises rpc call in a single time.
-  await Promise.all(promises);
-  return pendingTxMap;
-};
-
-const getProof = async (
-  txinfo: TxInfo,
-  l1BatchProvider: providers.JsonRpcBatchProvider,
-  l2BatchProvider: providers.JsonRpcBatchProvider,
-) => {
-  const iOutbox = Outbox__factory.createInterface();
-  const l2ToL1Classic = L2ToL1MessageClassic.fromBatchNumber(
-    l1BatchProvider,
-    txinfo.batchNumber,
-    txinfo.indexInBatch,
-  );
-  const proofInfo = await l2ToL1Classic.tryGetProof(l2BatchProvider);
-  if (proofInfo === null) {
-    txinfo.inputs = null;
-  } else {
-    txinfo.inputs = iOutbox.encodeFunctionData('executeTransaction', [
-      txinfo.batchNumber,
-      proofInfo.proof,
-      proofInfo.path,
-      proofInfo.l2Sender,
-      proofInfo.l1Dest,
-      proofInfo.l2Block,
-      proofInfo.l1Block,
-      proofInfo.timestamp,
-      proofInfo.amount,
-      proofInfo.calldataForL1,
-    ]);
-  }
 };
 
 const setOneJSON = (txInfo: TxInfo): string => {
@@ -294,7 +213,7 @@ const setOneJSON = (txInfo: TxInfo): string => {
   {
     l2txhash: ${txInfo.txhash},
     batchNumber: ${txInfo.batchNumber},
-    indexInBatch: ${txInfo.indexInBatch},
+    path: ${txInfo.path},
     returnType: ${txInfo.returnType},
     outbox: ${txInfo.outbox},
     calldata: ${txInfo.inputs},
@@ -347,7 +266,6 @@ export const setAllEstimate = async (
       await Promise.all(promises);
       promises = [];
       console.log(`Now already estimated ${counter} txns, sum ${estimateInfo.size}`);
-      wait(1500); //sleep or it will cause rpc throughput errors
     }
   }
   await Promise.all(promises);
