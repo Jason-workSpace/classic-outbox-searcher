@@ -73,9 +73,9 @@ export const getTxPath = async (
     //each batch only contains 980 proof call or it will cause rpc throughput errors
     if (counter % 980 == 0 && counter != 0) {
       await Promise.all(promises);
-    }
-    promises = [];
-    console.log(`Now already got ${counter} proofs, sum ${events.length}`);
+      promises = [];
+      console.log(`Now already got ${counter} proofs, sum ${events.length}`);
+    }   
   }
   await Promise.all(promises);
 };
@@ -111,12 +111,11 @@ const getProofToArr = async (
     ]);
     event.push(proofInfo.path.toString())
     event.push(inputs)
+    event.push(proofInfo.amount.toHexString())
     return event.length
   }
   
 };
-
-
 
 export const getAllWithdrawal = async (
   from: number,
@@ -186,6 +185,7 @@ export const extractTxInfo = (rawArry: string[], withdrawlType: boolean): Map<st
       inputs: withdrawlType ? rawArry[i + 12]: null,
       returnType: NOT_INIT,
       outbox: batchNumber.lt(30) ? outboxes[0] : outboxes[1],
+      callValue: withdrawlType ? rawArry[i + 13]: '0',
       estimateGas: BigNumber.from(0),
     };
     const curKey = ethers.utils.solidityKeccak256(
@@ -211,15 +211,15 @@ const setOneJSON = (txInfo: TxInfo): string => {
   
   return `
   {
-    l2txhash: ${txInfo.txhash},
-    batchNumber: ${txInfo.batchNumber},
-    path: ${txInfo.path},
-    returnType: ${txInfo.returnType},
-    outbox: ${txInfo.outbox},
-    calldata: ${txInfo.inputs},
-    targetAddr: ${targetAddr},
-    targetCalldata: ${targetCalldata},
-    estimateGas: ${txInfo.estimateGas}
+    "l2txhash": "${txInfo.txhash}",
+    "batchNumber": ${txInfo.batchNumber},
+    "path": ${txInfo.path},
+    "returnType": ${txInfo.returnType},
+    "outbox": "${txInfo.outbox}",
+    "calldata": "${txInfo.inputs}",
+    "targetAddr": "${targetAddr}",
+    "targetCalldata": "${targetCalldata}",
+    "estimateGas": ${txInfo.estimateGas}
   }`;
 };
 

@@ -15,11 +15,12 @@ export interface TxInfo {
   inputs: string | null;
   returnType: number;
   outbox: string;
+  callValue: string;
   estimateGas: BigNumber | null;
 }
 
 export const WithdrawSearchConfig: SearchConfig = {
-  eachLength: 13,
+  eachLength: 14,
   txhashAt: 10,
   batchNumberAt: 3,
   path: 11,
