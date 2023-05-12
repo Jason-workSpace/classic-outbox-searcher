@@ -2,6 +2,7 @@ import { ArbSys__factory } from '@arbitrum/sdk/dist/lib/abi/factories/ArbSys__fa
 import { ARB_SYS_ADDRESS } from '@arbitrum/sdk/dist/lib/dataEntities/constants';
 import { Outbox__factory } from '@arbitrum/sdk/dist/lib/abi/classic/factories/Outbox__factory';
 import { L2ToL1MessageClassic } from '@arbitrum/sdk/dist/lib/message/L2ToL1MessageClassic';
+import { ITokenGateway__factory } from "@arbitrum/sdk/dist/lib/abi/factories/ITokenGateway__factory";
 import { BaseContract, BigNumber, ethers, EventFilter, providers } from 'ethers';
 import args from './getClargs';
 import fs from 'fs';
@@ -202,11 +203,20 @@ const setOneJSON = (txInfo: TxInfo): string => {
   const iOutbox = Outbox__factory.createInterface()
   let targetAddr
   let targetCalldata
-
+  let erc20Addr = ""
+  let erc20Amount = "0x0"
   if(txInfo.inputs !== null) {
     const decodedData = iOutbox.decodeFunctionData("executeTransaction",txInfo.inputs)
     targetAddr = decodedData[4]
     targetCalldata = decodedData[9]
+  }
+  try {
+    const iTokenGateway = ITokenGateway__factory.createInterface()
+    const decodedData = iTokenGateway.decodeFunctionData("finalizeInboundTransfer", targetCalldata)
+    erc20Addr = decodedData[0]
+    erc20Amount = decodedData[3]
+  } catch {
+    //do noting
   }
   
   return `
@@ -220,6 +230,8 @@ const setOneJSON = (txInfo: TxInfo): string => {
     "targetAddr": "${targetAddr}",
     "targetCalldata": "${targetCalldata}",
     "callValue": "${txInfo.callValue}",
+    "erc20Addr": "${erc20Addr}",
+    "erc20Amount": "${erc20Amount}",
     "estimateGas": ${txInfo.estimateGas}
   }`;
 };
