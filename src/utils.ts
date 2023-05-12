@@ -214,7 +214,7 @@ const setOneJSON = (txInfo: TxInfo): string => {
     const iTokenGateway = ITokenGateway__factory.createInterface()
     const decodedData = iTokenGateway.decodeFunctionData("finalizeInboundTransfer", targetCalldata)
     erc20Addr = decodedData[0]
-    erc20Amount = decodedData[3]
+    erc20Amount = BigNumber.from(decodedData[3]).toHexString() 
   } catch {
     //do noting
   }
