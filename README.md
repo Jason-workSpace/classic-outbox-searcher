@@ -10,12 +10,12 @@ This is used to find all l2 -> l1 txns and get those l1 unexecuted txns' executi
 ## Command Process
 Because it will use too many rpc calls to execute those flows one time we described above, so we seperate it to 3 commands to run. First command do (1), second command do (2), third command do (3) and (4).
 Also, because we have 2 classic outboxes , you might need specific outbox type when search event `OutBoxTransactionExecuted`: outbox2 for `0x667e23ABd27E623c11d4CC00ca3EC4d0bD63337a` and outbox3 for `0x760723CD2e632826c38Fef8CD438A4CC7E7E1A40`.
-1. Get all `OutBoxTransactionExecuted`:
+1. Get all `OutBoxTransactionExecuted` (note the block number range here is for l1):
 ```
 yarn ts-node ./src/main.ts --action GetOutboxEvent --from {FROM_BLOCK} --to {TO_BLOCK} --l1RpcUrl {YOUR_RPC_URL} --outputFile {OUTBOX_FILE} --outboxType {OUTBOX_TYPE}
 ```
 
-2. Get all `L2ToL1Transaction`:
+2. Get all `L2ToL1Transaction` (note the block number range here is for l2):
 ```
 yarn ts-node ./src/main.ts --action GetWithdrawEvent --from {FROM_BLOCK} --to {TO_BLOCK} --l1RpcUrl {YOUR_L1_RPC_URL} --l2RpcUrl {YOUR_RPC_URL} --outputFile {WITHDRAW_FILE}  
 ```
